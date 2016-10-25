@@ -1,0 +1,7 @@
+**List of resources referred to:**
+- https://www.google.co.uk/webhp?sourceid=chrome-instant&ion=1&espv=2&ie=UTF-8#q=portland%20city
+- https://en.wikipedia.org/wiki/ZIP_Code#ZIP.2B4
+- https://gist.github.com/carlward/54ec1c91b62a5f911c42#file-sample_project-md
+- https://gist.github.com/swwelch/f1144229848b407e0a5d13fcb7fbbd6f
+- https://discussions.udacity.com/t/creating-db-file-from-csv-files-with-non-ascii-unicode-characters/174958
+- https://discussions.udacity.com/t/preparing-for-database-quiz-testing-env/173288

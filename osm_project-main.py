@@ -9,7 +9,6 @@ import codecs
 import cerberus
 import schema
 
-
 osmfile = "portland_oregon.osm"
 #osmfile = "sample.osm"
 
@@ -19,6 +18,8 @@ WAYS_PATH = "ways.csv"
 WAY_NODES_PATH = "ways_nodes.csv"
 WAY_TAGS_PATH = "ways_tags.csv"
 
+# Compile a regular expression pattern into a regular expression object,
+# which can be used for matching using its match() and search() methods"
 LOWER_COLON = re.compile(r'^([a-z]|_)+:([a-z]|_)+')
 PROBLEMCHARS = re.compile(r'[=\+/&<>;\'"\?%#$@\,\. \t\r\n]')
 street_type_re = re.compile(r'\b\S+\.?$', re.IGNORECASE)
@@ -31,6 +32,8 @@ NODE_TAGS_FIELDS = ['id', 'key', 'value', 'type']
 WAY_FIELDS = ['id', 'user', 'uid', 'version', 'changeset', 'timestamp']
 WAY_TAGS_FIELDS = ['id', 'key', 'value', 'type']
 WAY_NODES_FIELDS = ['id', 'node_id', 'position']
+
+
 
 
 def get_element(osm_file, tags=('node', 'way', 'relation')):
@@ -69,48 +72,85 @@ mapping = { "Ave": "Avenue",
             "Ln": "Lane",
             }
 
+
+# For auditing street_types
 def is_street_name(elem):
+    """Check to see if key is equal to addr:street and return bool value (true for succes, false otherwise)."""
     return (elem.attrib['k'] == "addr:street")
 
+
 def audit_street_type(street_types, street_name):
+    """
+    Search the string 'street_name' for its street type and if not in 'expected' array, build and return 'street_types' dictionary.
+
+    Args:
+        street_types (str): first parameter
+        street_name (str): second parameter
+
+    Returns:
+        dictionary of sets: [('street_type_A', set([street_name1, street_name2])), ('street_type_B', set([street_name1, street_name2]))]
+
+    """
     m = street_type_re.search(street_name)
     if m:
         street_type = m.group()
         if street_type not in expected:
             street_types[street_type].add(street_name)
+            return street_types
 
-def is_zip_code(elem):
-    return (elem.attrib['k']) == "addr:postcode"
+# For auditing postcodes
+def is_postcode(elem):
+    """Check to see if key is equal to addr:street and return bool value (true for succes, false otherwise)."""
+    return (elem.attrib['k'] == "addr:postcode")
 
-def audit_zipcode(postcode):
-    if "-" in postcode:
-        return postcode [:5]
-    else:
-        return postcode
+def audit_postcode(postcodes, postcode):
     """
-    if len(postcode) != 5:
-        print postcode
+    Build and return postcodes dictionary by adding postcode value sets.
+
+    Args:
+        postcodes (int): first parameter
+        postcode (int): second parameter
+
+    Returns:
+        dictionary of sets
+
     """
+    postcodes[postcode].add(postcode)
+    return postcodes
 
 
+# Main function running the audits
 def audit(osmfile):
+    """Open and iterate over osmfile, yield element if right tag, run audits on values of "tag" tags, pprint dictionaries as necessary."""
     osm_file = open(osmfile, "r")
     #keep track of unusual street_types
     street_types = defaultdict(set)
+    postcodes = defaultdict(set)
     for i, elem in enumerate(get_element(osmfile)):
         if elem.tag == "node" or elem.tag == "way":
+            #modifies behavior of .iter and only return "tag" tags
             for tag in elem.iter("tag"):
                 if is_street_name(tag):
                     audit_street_type(street_types, tag.attrib['v'])
-                elif is_zip_code(tag):
-                    audit_zipcode(tag.attrib['v'])
+                elif is_postcode(tag):
+                    audit_postcode(postcodes, tag.attrib['v'])
     osm_file.close()
-    return street_types
+    #pprint.pprint(dict(postcodes))
     #pprint.pprint(dict(street_types))
 
 
 def update_name(name, mapping):
-    #initialize m and search through argument name using regex
+    """
+    Search the string 'name' using regex, if street_type in mapping dictionary, update and return name.
+
+    Args:
+        name (str): first parameter
+        mapping (str): second parameter
+
+    Returns:
+        name (str): updated name
+    """
+    #initialize m and search through arg. 'name' using regex
     m = street_type_re.search(name)
     if m:
         street_type = m.group()
@@ -119,9 +159,27 @@ def update_name(name, mapping):
             name = re.sub(street_type, mapping[street_type], name)
     return name
 
+
+def update_postcode(postcode):
+    """
+    Match postcode to regex, select and return clean postcodes.
+
+    Args:
+        postcode (int): single parameter
+
+    Returns:
+        clean_postcode(int): updated postcode
+    """
+    search = re.match(r'^\D*(\d{5}).*', postcode)
+    # select group that is captured
+    clean_postcode = search.group(1)
+    return clean_postcode
+
+
 def shape_element(element, node_attr_fields=NODE_FIELDS, way_attr_fields=WAY_FIELDS,
                   problem_chars=PROBLEMCHARS, default_tag_type='regular'):
-
+    """Clean and shape node or way XML element to Python dict."""
+    """The function should take as input an iterparse Element object and return a dictionary."""
     node_attribs = {} #dictionary {'id': 757860928, 'user': }
     tags = []  # an array of dictionaries [{'id': 757860928,'key': 'amenity'},  {'id': 757860928}
     way_attribs = {}
@@ -174,12 +232,14 @@ def shape_element(element, node_attr_fields=NODE_FIELDS, way_attr_fields=WAY_FIE
             tags_dict["key"] = tag_key
             tags_dict["type"] = default_tag_type
 
+        #create and update value of street_name
         tag_value = tag.attrib["v"]
-        #where cleaning of name occurs
-        tags_dict["value"] = update_name(tag_value, mapping)
+        if 'postcode' in tag_key:
+            tags_dict["value"] = update_postcode(tag_value)
+        else:
+            tags_dict["value"] = update_name(tag_value, mapping)
 
         tags.append(tags_dict)
-
 
     if element.tag == 'node':
         return {'node': node_attribs, 'node_tags': tags}

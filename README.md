@@ -1,2 +1,2 @@
-# osm_project
+# Project OSM
 Analysis of Portland's OSM
